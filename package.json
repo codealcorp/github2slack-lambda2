@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "axios": "^0.18.0",
+    "crypto-js": "^3.1.9-1",
+    "js-yaml": "^3.12.0"
+  },
+  "devDependencies": {
+    "serverless-kms-secrets": "^1.0.3",
+    "serverless-offline": "^3.31.3"
+  }
+}

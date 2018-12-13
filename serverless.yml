@@ -1,0 +1,35 @@
+service: github2slack2
+
+custom:
+  defaultStage: dev
+  kmsSecrets: ${file(kms-secrets.${opt:stage, self:provider.stage}.${opt:region, self:provider.region}.yml)}
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  region: ap-northeast-1
+  stage: ${opt:stage, self:custom.defaultStage}
+  memorySize: 512
+  timeout: 10
+  environment:
+    STAGE: ${opt:stage, self:custom.defaultStage}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+      - KMS:Decrypt
+      Resource: ${self:custom.kmsSecrets.keyArn}
+
+plugins:
+  - serverless-kms-secrets
+  - serverless-offline
+
+functions:
+  github2slack:
+    handler: handler.handle
+    events:
+      - http:
+          path: github2slack
+          method: post
+    environment:
+      SLACK_WEBHOOK_URL: ${self:custom.kmsSecrets.secrets.SLACK_WEBHOOK_URL}
+      GITHUB_WEBHOOK_SECRET: ${self:custom.kmsSecrets.secrets.GITHUB_WEBHOOK_SECRET}
