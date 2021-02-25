@@ -39,6 +39,12 @@ const handle = async (event) => {
       text += convertName(comment.body) + "\n";
       text += comment.html_url;
       break;
+    case 'pull_request_review':
+      const review = msg.review;
+      text += review.user.login + ": \n";
+      text += convertName(review.body) + "\n";
+      text += review.html_url;
+      break;
     case 'issues':
       const issue = msg.issue;
       if (msg.action === 'opended' || msg.action === 'closed') {
