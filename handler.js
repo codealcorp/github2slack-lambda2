@@ -8,8 +8,12 @@ const axios = require('axios')
 const handle = async (event) => {
   let userMap = yaml.safeLoad(fs.readFileSync(`usermap.${process.env['STAGE']}.${process.env['AWS_REGION']}.yml`, 'utf-8'))
   const convertName = (body) => {
-    return body.replace(/@[a-zA-Z0-9_\-]+/g, function (m) {
-      return userMap[m] || m;
+    return body.replace(/@([a-zA-Z0-9_\-]+)/g, function (m, m2) {
+      if (userMap[m2]) {
+        return `<@${userMap[m2]}>`
+      } else {
+        return m
+      }
     })
   }
 
@@ -75,10 +79,7 @@ const handle = async (event) => {
     const slackWebhookUrlData = await kms.decrypt({CiphertextBlob: Buffer(process.env.SLACK_WEBHOOK_URL, 'base64')}).promise()
     const slackWebhookUrl = String(slackWebhookUrlData.Plaintext)
 
-    await axios.post(slackWebhookUrl, {
-      text,
-      link_names: 1
-    })
+    await axios.post(slackWebhookUrl, {text})
   }
 
   return {statusCode: 200, body: '{}'}
