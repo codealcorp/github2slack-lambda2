@@ -15,7 +15,7 @@ async function decryptSecret(cipherBase64Text) {
 }
 
 export async function handle(event) {
-  let userMap = yaml.safeLoad(fs.readFileSync(`usermap.${process.env['STAGE']}.${process.env['AWS_REGION']}.yml`, 'utf-8'))
+  let userMap = yaml.load(fs.readFileSync(`usermap.${process.env['STAGE']}.${process.env['AWS_REGION']}.yml`, 'utf-8'))
   const convertName = (body) => {
     return body.replace(/@([a-zA-Z0-9_\-]+)/g, function (m, m2) {
       if (userMap[m2]) {
