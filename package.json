@@ -3,5 +3,8 @@
     "axios": "^0.21.2",
     "crypto-js": "^3.1.9-1",
     "js-yaml": "^3.13.1"
+  },
+  "devDependencies": {
+    "serverless": "^3.28.1"
   }
 }

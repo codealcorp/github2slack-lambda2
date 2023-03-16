@@ -13,11 +13,13 @@ provider:
   timeout: 10
   environment:
     STAGE: ${opt:stage, self:custom.defaultStage}
-  iamRoleStatements:
-    - Effect: Allow
-      Action:
-      - KMS:Decrypt
-      Resource: ${self:custom.kmsSecrets.keyArn}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+          - KMS:Decrypt
+          Resource: ${self:custom.kmsSecrets.keyArn}
 
 functions:
   github2slack:
