@@ -1,9 +1,18 @@
 import fs from 'node:fs'
+import {DecryptCommand, KMSClient} from '@aws-sdk/client-kms'
 import yaml from 'js-yaml'
-import AWS from 'aws-sdk'
 import CryptoJS from 'crypto-js'
 
-const kms = new AWS.KMS()
+const kms = new KMSClient()
+
+async function decryptSecret(cipherBase64Text) {
+  const decryptCommand = new DecryptCommand({
+    CiphertextBlob: Uint8Array.from(Buffer.from(cipherBase64Text, 'base64'))
+  })
+  const commandResult = await kms.send(decryptCommand)
+  const plaintext = (new TextDecoder()).decode(commandResult.Plaintext)
+  return plaintext
+}
 
 export async function handle(event) {
   let userMap = yaml.safeLoad(fs.readFileSync(`usermap.${process.env['STAGE']}.${process.env['AWS_REGION']}.yml`, 'utf-8'))
@@ -21,8 +30,7 @@ export async function handle(event) {
     return '<' + url + '|' + text + '>';
   };
 
-  const githubWebhookSecretData = await kms.decrypt({CiphertextBlob: Buffer(process.env.GITHUB_WEBHOOK_SECRET, 'base64')}).promise()
-  const webhookSecret = String(githubWebhookSecretData.Plaintext)
+  const webhookSecret = await decryptSecret(process.env.GITHUB_WEBHOOK_SECRET)
 
   if (event.headers['X-Hub-Signature'] !== `sha1=${CryptoJS.HmacSHA1(event.body, webhookSecret).toString(CryptoJS.enc.Hex)}`) {
     return {
@@ -76,9 +84,7 @@ export async function handle(event) {
   }
 
   if (text) {
-    const slackWebhookUrlData = await kms.decrypt({CiphertextBlob: Buffer(process.env.SLACK_WEBHOOK_URL, 'base64')}).promise()
-    const slackWebhookUrl = String(slackWebhookUrlData.Plaintext)
-
+    const slackWebhookUrl = await decryptSecret(process.env.SLACK_WEBHOOK_URL)
     const response = await fetch(slackWebhookUrl, {
       method: 'POST',
       headers: {
