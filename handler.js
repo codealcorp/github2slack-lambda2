@@ -1,11 +1,12 @@
-const fs = require('fs')
-const yaml = require('js-yaml')
-const {KMS} = require('aws-sdk')
-const kms = new KMS()
-const CryptoJS = require('crypto-js')
-const axios = require('axios')
+import fs from 'node:fs'
+import yaml from 'js-yaml'
+import AWS from 'aws-sdk'
+import CryptoJS from 'crypto-js'
+import axios from 'axios'
 
-const handle = async (event) => {
+const kms = new AWS.KMS()
+
+export async function handle(event) {
   let userMap = yaml.safeLoad(fs.readFileSync(`usermap.${process.env['STAGE']}.${process.env['AWS_REGION']}.yml`, 'utf-8'))
   const convertName = (body) => {
     return body.replace(/@([a-zA-Z0-9_\-]+)/g, function (m, m2) {
@@ -84,12 +85,3 @@ const handle = async (event) => {
 
   return {statusCode: 200, body: '{}'}
 }
-
-module.exports.handle = (event, context, callback) => {
-  handle(event).then(r => {
-    callback(null, r)
-  }).catch(e => {
-    console.error(e)
-    callback(null, {statusCode: 500, body: JSON.stringify({message: 'Internal server error.'})})
-  })
-};
