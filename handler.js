@@ -2,7 +2,6 @@ import fs from 'node:fs'
 import yaml from 'js-yaml'
 import AWS from 'aws-sdk'
 import CryptoJS from 'crypto-js'
-import axios from 'axios'
 
 const kms = new AWS.KMS()
 
@@ -80,7 +79,22 @@ export async function handle(event) {
     const slackWebhookUrlData = await kms.decrypt({CiphertextBlob: Buffer(process.env.SLACK_WEBHOOK_URL, 'base64')}).promise()
     const slackWebhookUrl = String(slackWebhookUrlData.Plaintext)
 
-    await axios.post(slackWebhookUrl, {text})
+    const response = await fetch(slackWebhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({text})
+    })
+
+    if (!response.ok) {
+      console.error(JSON.stringify({
+        error: 'Slack webhook error',
+        statusCode: response.status,
+        body: await response.text()
+      }))
+      throw new Error('Failed to send request to Slack webhook.')
+    }
   }
 
   return {statusCode: 200, body: '{}'}
