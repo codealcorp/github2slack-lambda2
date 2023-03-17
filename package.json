@@ -5,6 +5,7 @@
     "js-yaml": "^3.13.1"
   },
   "devDependencies": {
+    "@aws-sdk/client-kms": "^3.293.0",
     "serverless": "^3.28.1"
   }
 }
