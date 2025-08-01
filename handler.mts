@@ -1,8 +1,7 @@
-import fs from 'node:fs'
 import {DecryptCommand, KMSClient} from '@aws-sdk/client-kms'
 import type {LambdaFunctionURLEvent, LambdaFunctionURLResult} from 'aws-lambda'
-import yaml from 'js-yaml'
 import CryptoJS from 'crypto-js'
+import userMapJson from './usermap.json' with {type: 'json'}
 
 const kms = new KMSClient({})
 
@@ -18,12 +17,7 @@ async function decryptSecret(cipherBase64Text: string): Promise<string> {
 export async function handle(
   event: LambdaFunctionURLEvent
 ): Promise<LambdaFunctionURLResult> {
-  const userMap: Record<string, string> = yaml.load(
-    fs.readFileSync(
-      `usermap.${process.env['STAGE']}.${process.env['AWS_REGION']}.yml`,
-      'utf-8'
-    )
-  )
+  const userMap: Record<string, string> = userMapJson.usermap
   const convertName = (body: string): string => {
     return body.replace(/@([a-zA-Z0-9_\-]+)/g, function (m, m2) {
       if (userMap[m2]) {
@@ -41,7 +35,7 @@ export async function handle(
   const webhookSecret = await decryptSecret(process.env.GITHUB_WEBHOOK_SECRET!)
 
   if (
-    event.headers['X-Hub-Signature'] !==
+    event.headers['x-hub-signature'] !==
     `sha1=${CryptoJS.HmacSHA1(event.body, webhookSecret).toString(CryptoJS.enc.Hex)}`
   ) {
     return {
@@ -51,7 +45,7 @@ export async function handle(
   }
 
   const msg = JSON.parse(event.body!)
-  const eventName = event.headers['X-GitHub-Event']
+  const eventName = event.headers['x-github-event']
   let text = ''
 
   switch (eventName) {

@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: github2slack2
+
+Parameters:
+  SlackWebhookUrl:
+    Type: String
+  GithubWebhookSecret:
+    Type: String
+
+Resources:
+  Github2SlackFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: handler.handle
+      Runtime: nodejs22.x
+      Architectures:
+        - arm64
+      Timeout: 10
+      MemorySize: 512
+      LoggingConfig:
+        LogFormat: JSON
+      Environment:
+        Variables:
+          SLACK_WEBHOOK_URL: !Ref SlackWebhookUrl
+          GITHUB_WEBHOOK_SECRET: !Ref GithubWebhookSecret
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action: kms:Decrypt
+              Resource: '*'
+      FunctionUrlConfig:
+        AuthType: NONE
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: esm
+        Minify: false
+        EntryPoints:
+          - handler.mts
+        OutExtension:
+          - .js=.mjs
+        External:
+          - '@aws-sdk/client-kms'

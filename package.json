@@ -2,7 +2,7 @@
   "type": "module",
   "dependencies": {
     "crypto-js": "^4.2.0",
-    "js-yaml": "^4.1.0"
+    "esbuild": "^0.25.8"
   },
   "devDependencies": {
     "@aws-sdk/client-kms": "^3.293.0",
