@@ -4,10 +4,12 @@ Transform: AWS::Serverless-2016-10-31
 Description: github2slack2
 
 Parameters:
-  SlackWebhookUrl:
+  SlackWebhookParameterName:
     Type: String
-  GithubWebhookSecret:
+    Description: Name of the SSM Parameter for Slack Webhook URL
+  GithubWebhookSecretParameterName:
     Type: String
+    Description: Name of the SSM Parameter for Github Webhook Secret
 
 Resources:
   Github2SlackFunction:
@@ -24,14 +26,23 @@ Resources:
         LogFormat: JSON
       Environment:
         Variables:
-          SLACK_WEBHOOK_URL: !Ref SlackWebhookUrl
-          GITHUB_WEBHOOK_SECRET: !Ref GithubWebhookSecret
+          SLACK_WEBHOOK_PARAMETER_NAME: !Ref SlackWebhookParameterName
+          GITHUB_WEBHOOK_SECRET_PARAMETER_NAME: !Ref GithubWebhookSecretParameterName
       Policies:
         - Version: '2012-10-17'
           Statement:
             - Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource:
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SlackWebhookParameterName}"
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${GithubWebhookSecretParameterName}"
+            - Effect: Allow
               Action: kms:Decrypt
               Resource: '*'
+              Condition:
+                StringEquals:
+                  kms:RequestAlias: "alias/aws/ssm"
       FunctionUrlConfig:
         AuthType: NONE
     Metadata:
@@ -44,4 +55,4 @@ Resources:
         OutExtension:
           - .js=.mjs
         External:
-          - '@aws-sdk/client-kms'
+          - '@aws-sdk/client-ssm'

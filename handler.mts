@@ -1,17 +1,21 @@
-import {DecryptCommand, KMSClient} from '@aws-sdk/client-kms'
+import {SSMClient, GetParameterCommand} from '@aws-sdk/client-ssm'
 import type {LambdaFunctionURLEvent, LambdaFunctionURLResult} from 'aws-lambda'
 import CryptoJS from 'crypto-js'
 import userMapJson from './usermap.json' with {type: 'json'}
 
-const kms = new KMSClient({})
+const ssm = new SSMClient({})
 
-async function decryptSecret(cipherBase64Text: string): Promise<string> {
-  const decryptCommand = new DecryptCommand({
-    CiphertextBlob: Uint8Array.from(Buffer.from(cipherBase64Text, 'base64'))
+async function getParameterValue(parameterName: string): Promise<string> {
+  const command = new GetParameterCommand({
+    Name: parameterName,
+    WithDecryption: true
   })
-  const commandResult = await kms.send(decryptCommand)
-  const plaintext = new TextDecoder().decode(commandResult.Plaintext)
-  return plaintext
+  const response = await ssm.send(command)
+  const value = response.Parameter?.Value
+  if (!value) {
+    throw new Error(`SSM Parameter not found or empty: ${parameterName}`)
+  }
+  return value
 }
 
 export async function handle(
@@ -32,7 +36,10 @@ export async function handle(
     return '<' + url + '|' + text + '>'
   }
 
-  const webhookSecret = await decryptSecret(process.env.GITHUB_WEBHOOK_SECRET!)
+  // Get secrets from SSM Parameter Store
+  const githubWebhookSecretParamName =
+    process.env.GITHUB_WEBHOOK_SECRET_PARAMETER_NAME!
+  const webhookSecret = await getParameterValue(githubWebhookSecretParamName)
 
   if (
     event.headers['x-hub-signature'] !==
@@ -95,7 +102,8 @@ export async function handle(
   }
 
   if (text) {
-    const slackWebhookUrl = await decryptSecret(process.env.SLACK_WEBHOOK_URL!)
+    const slackWebhookParamName = process.env.SLACK_WEBHOOK_PARAMETER_NAME!
+    const slackWebhookUrl = await getParameterValue(slackWebhookParamName)
     const response = await fetch(slackWebhookUrl, {
       method: 'POST',
       headers: {
