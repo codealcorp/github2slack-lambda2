@@ -1,5 +1,13 @@
 import crypto from 'node:crypto'
 import {SSMClient, GetParameterCommand} from '@aws-sdk/client-ssm'
+import type {
+  IssueCommentEvent,
+  IssuesEvent,
+  PullRequestEvent,
+  PullRequestReviewCommentEvent,
+  PullRequestReviewEvent,
+  PushEvent
+} from '@octokit/webhooks-types'
 import type {LambdaFunctionURLEvent, LambdaFunctionURLResult} from 'aws-lambda'
 import userMapJson from './usermap.json' with {type: 'json'}
 
@@ -55,36 +63,42 @@ export async function handle(
     }
   }
 
-  const msg = JSON.parse(event.body!)
+  const msg: unknown = JSON.parse(event.body!)
   const eventName = event.headers['x-github-event']
   let text = ''
 
   switch (eventName) {
     case 'issue_comment':
     case 'pull_request_review_comment':
-      const comment = msg.comment
+      const commentEvent = msg as
+        | IssueCommentEvent
+        | PullRequestReviewCommentEvent
+      const comment = commentEvent.comment
       text += comment.user.login + ': \n'
       text += convertName(comment.body) + '\n'
       text += comment.html_url
       break
     case 'pull_request_review':
-      const review = msg.review
+      const reviewEvent = msg as PullRequestReviewEvent
+      const review = reviewEvent.review
       text += review.user.login + ': \n'
-      text += convertName(review.body) + '\n'
+      text += convertName(review.body || '') + '\n'
       text += review.html_url
       break
     case 'issues':
-      const issue = msg.issue
-      if (msg.action === 'opended' || msg.action === 'closed') {
-        text += 'Issue ' + msg.action + '\n'
+      const issueEvent = msg as IssuesEvent
+      const issue = issueEvent.issue
+      if (issueEvent.action === 'opened' || issueEvent.action === 'closed') {
+        text += 'Issue ' + issueEvent.action + '\n'
         text += link(issue.html_url, issue.title)
       }
       break
     case 'push':
+      const pushEvent = msg as PushEvent
       text += 'Pushed' + '\n'
-      text += msg.compare + '\n'
-      for (let i = 0; i < msg.commits.length; i++) {
-        const commit = msg.commits[i]
+      text += pushEvent.compare + '\n'
+      for (let i = 0; i < pushEvent.commits.length; i++) {
+        const commit = pushEvent.commits[i]
         text +=
           link(commit.url, commit.id.substr(0, 8)) +
           ' ' +
@@ -95,9 +109,13 @@ export async function handle(
       }
       break
     case 'pull_request':
-      const pull_request = msg.pull_request
-      if (msg.action === 'opended' || msg.action === 'closed') {
-        text += 'Pull Request ' + msg.action + '\n'
+      const pullRequestEvent = msg as PullRequestEvent
+      const pull_request = pullRequestEvent.pull_request
+      if (
+        pullRequestEvent.action === 'opened' ||
+        pullRequestEvent.action === 'closed'
+      ) {
+        text += 'Pull Request ' + pullRequestEvent.action + '\n'
         text += pull_request.title + '\n'
         text += pull_request.body + '\n'
         text += pull_request.html_url
