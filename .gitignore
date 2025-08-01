@@ -4,9 +4,8 @@
 node_modules
 jspm_packages
 
-# Serverless directories
-.serverless
+/.aws-sam
+/samconfig.toml
 
 # config
-usermap.*
-kms-secrets.*
+/usermap.json

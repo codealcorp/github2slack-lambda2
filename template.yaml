@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: github2slack2
+
+Parameters:
+  SlackWebhookParameterName:
+    Type: String
+    Description: Name of the SSM Parameter for Slack Webhook URL
+  GithubWebhookSecretParameterName:
+    Type: String
+    Description: Name of the SSM Parameter for Github Webhook Secret
+
+Resources:
+  Github2SlackFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: handler.handle
+      Runtime: nodejs22.x
+      Architectures:
+        - arm64
+      Timeout: 10
+      MemorySize: 512
+      LoggingConfig:
+        LogFormat: JSON
+      Environment:
+        Variables:
+          SLACK_WEBHOOK_PARAMETER_NAME: !Ref SlackWebhookParameterName
+          GITHUB_WEBHOOK_SECRET_PARAMETER_NAME: !Ref GithubWebhookSecretParameterName
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource:
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SlackWebhookParameterName}"
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${GithubWebhookSecretParameterName}"
+            - Effect: Allow
+              Action: kms:Decrypt
+              Resource: '*'
+              Condition:
+                StringEquals:
+                  kms:RequestAlias: "alias/aws/ssm"
+      FunctionUrlConfig:
+        AuthType: NONE
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: esm
+        Minify: false
+        EntryPoints:
+          - handler.mts
+        OutExtension:
+          - .js=.mjs
+        External:
+          - '@aws-sdk/client-ssm'

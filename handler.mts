@@ -1,29 +1,27 @@
-import fs from 'node:fs'
-import {DecryptCommand, KMSClient} from '@aws-sdk/client-kms'
+import crypto from 'node:crypto'
+import {SSMClient, GetParameterCommand} from '@aws-sdk/client-ssm'
 import type {LambdaFunctionURLEvent, LambdaFunctionURLResult} from 'aws-lambda'
-import yaml from 'js-yaml'
-import CryptoJS from 'crypto-js'
+import userMapJson from './usermap.json' with {type: 'json'}
 
-const kms = new KMSClient({})
+const ssm = new SSMClient({})
 
-async function decryptSecret(cipherBase64Text: string): Promise<string> {
-  const decryptCommand = new DecryptCommand({
-    CiphertextBlob: Uint8Array.from(Buffer.from(cipherBase64Text, 'base64'))
+async function getParameterValue(parameterName: string): Promise<string> {
+  const command = new GetParameterCommand({
+    Name: parameterName,
+    WithDecryption: true
   })
-  const commandResult = await kms.send(decryptCommand)
-  const plaintext = new TextDecoder().decode(commandResult.Plaintext)
-  return plaintext
+  const response = await ssm.send(command)
+  const value = response.Parameter?.Value
+  if (!value) {
+    throw new Error(`SSM Parameter not found or empty: ${parameterName}`)
+  }
+  return value
 }
 
 export async function handle(
   event: LambdaFunctionURLEvent
 ): Promise<LambdaFunctionURLResult> {
-  const userMap: Record<string, string> = yaml.load(
-    fs.readFileSync(
-      `usermap.${process.env['STAGE']}.${process.env['AWS_REGION']}.yml`,
-      'utf-8'
-    )
-  )
+  const userMap: Record<string, string> = userMapJson.usermap
   const convertName = (body: string): string => {
     return body.replace(/@([a-zA-Z0-9_\-]+)/g, function (m, m2) {
       if (userMap[m2]) {
@@ -38,12 +36,19 @@ export async function handle(
     return '<' + url + '|' + text + '>'
   }
 
-  const webhookSecret = await decryptSecret(process.env.GITHUB_WEBHOOK_SECRET!)
+  // Get secrets from SSM Parameter Store
+  const githubWebhookSecretParamName =
+    process.env.GITHUB_WEBHOOK_SECRET_PARAMETER_NAME!
+  const webhookSecret = await getParameterValue(githubWebhookSecretParamName)
 
-  if (
-    event.headers['X-Hub-Signature'] !==
-    `sha1=${CryptoJS.HmacSHA1(event.body, webhookSecret).toString(CryptoJS.enc.Hex)}`
-  ) {
+  const signature256 =
+    'sha256=' +
+    crypto
+      .createHmac('sha256', webhookSecret)
+      .update(event.body ?? '', 'utf8')
+      .digest('hex')
+
+  if (event.headers['x-hub-signature-256'] !== signature256) {
     return {
       statusCode: 401,
       body: 'signature issue'
@@ -51,7 +56,7 @@ export async function handle(
   }
 
   const msg = JSON.parse(event.body!)
-  const eventName = event.headers['X-GitHub-Event']
+  const eventName = event.headers['x-github-event']
   let text = ''
 
   switch (eventName) {
@@ -101,7 +106,8 @@ export async function handle(
   }
 
   if (text) {
-    const slackWebhookUrl = await decryptSecret(process.env.SLACK_WEBHOOK_URL!)
+    const slackWebhookParamName = process.env.SLACK_WEBHOOK_PARAMETER_NAME!
+    const slackWebhookUrl = await getParameterValue(slackWebhookParamName)
     const response = await fetch(slackWebhookUrl, {
       method: 'POST',
       headers: {
