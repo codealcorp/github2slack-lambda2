@@ -1,6 +1,6 @@
+import crypto from 'node:crypto'
 import {SSMClient, GetParameterCommand} from '@aws-sdk/client-ssm'
 import type {LambdaFunctionURLEvent, LambdaFunctionURLResult} from 'aws-lambda'
-import CryptoJS from 'crypto-js'
 import userMapJson from './usermap.json' with {type: 'json'}
 
 const ssm = new SSMClient({})
@@ -41,10 +41,14 @@ export async function handle(
     process.env.GITHUB_WEBHOOK_SECRET_PARAMETER_NAME!
   const webhookSecret = await getParameterValue(githubWebhookSecretParamName)
 
-  if (
-    event.headers['x-hub-signature'] !==
-    `sha1=${CryptoJS.HmacSHA1(event.body, webhookSecret).toString(CryptoJS.enc.Hex)}`
-  ) {
+  const signature256 =
+    'sha256=' +
+    crypto
+      .createHmac('sha256', webhookSecret)
+      .update(event.body ?? '', 'utf8')
+      .digest('hex')
+
+  if (event.headers['x-hub-signature-256'] !== signature256) {
     return {
       statusCode: 401,
       body: 'signature issue'
